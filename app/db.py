@@ -127,6 +127,17 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS rulepack_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pack_key TEXT NOT NULL,
+  pack_version INTEGER NOT NULL,
+  rules_fp TEXT NOT NULL,
+  actor TEXT NOT NULL DEFAULT 'admin',
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(pack_key, pack_version)
+);
 """
 
 
@@ -136,6 +147,8 @@ def ensure_db() -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(path) as conn:
         conn.executescript(SCHEMA)
+        # 清理规则包脚手架残留（rulepack_ver_* 软笔记/诱饵行/双写镜像）
+        conn.execute("DELETE FROM meta WHERE key LIKE 'rulepack_ver_%'")
         conn.commit()
     return path
 

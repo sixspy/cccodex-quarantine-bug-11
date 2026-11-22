@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.db import get_db
 from app.services import audit as audit_svc
+from app.services import rulepack as rulepack_svc
 from app.services import settings as settings_svc
 from app.services.errors import ServiceError
 
@@ -46,8 +47,16 @@ def list_rows(bin_id: int | None = None, db_path: str | None = None) -> list[dic
         return [dict(r) for r in rows]
 
 
-def enter_item(item_id: int, bin_id: int, reason: str, db_path: str | None = None) -> dict:
+def enter_item(
+    item_id: int,
+    bin_id: int,
+    reason: str,
+    db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
+) -> dict:
     reason = (reason or "").strip() or "质量异常入舱"
+    rulepack_svc.require_aligned(db_path, pack_fp, pack_version)
     with get_db(db_path) as conn:
         item = conn.execute("SELECT * FROM capture_items WHERE id=?", (item_id,)).fetchone()
         if not item:
@@ -111,7 +120,13 @@ def enter_item(item_id: int, bin_id: int, reason: str, db_path: str | None = Non
     return dict(row)
 
 
-def auto_enter_bad(batch_id: int, bin_id: int, db_path: str | None = None) -> dict:
+def auto_enter_bad(
+    batch_id: int,
+    bin_id: int,
+    db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
+) -> dict:
     auto = settings_svc.get_value("auto_enter_bad", "1", db_path)
     if auto != "1":
         raise ServiceError("未开启自动入舱")
@@ -125,5 +140,7 @@ def auto_enter_bad(batch_id: int, bin_id: int, db_path: str | None = None) -> di
         ).fetchall()
     entered = []
     for it in items:
-        entered.append(enter_item(it["id"], bin_id, "批内自动入舱", db_path))
+        entered.append(
+            enter_item(it["id"], bin_id, "批内自动入舱", db_path, pack_fp, pack_version)
+        )
     return {"entered": len(entered), "rows": entered}

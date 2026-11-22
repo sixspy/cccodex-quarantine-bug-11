@@ -1,12 +1,17 @@
 
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip } from '../rulepack.js';
 
 export async function renderAudit(el) {
-  const data = await api('/api/audits?limit=120');
+  const [data, rp] = await Promise.all([
+    api('/api/audits?limit=120'),
+    loadRulepack(),
+  ]);
   const sum = data.summary || { total: 0, by_action: [] };
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip">规则包已亮</span> 审计轨迹</h2>
+      <h2>审计轨迹</h2>
+      ${rulepackStrip(rp)}
       <p class="muted">共 ${sum.total} 条。动作分布：
         ${(sum.by_action || []).map((a) => `${a.action} ${a.c}`).join(' · ') || '暂无'}
       </p>

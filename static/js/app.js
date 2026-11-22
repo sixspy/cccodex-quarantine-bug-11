@@ -25,8 +25,10 @@ const pages = {
 async function refreshDash() {
   try {
     const d = await api('/api/dashboard');
+    const rp = d.rulepack || {};
     document.getElementById('dashHint').textContent =
-      ` · 批次${d.batches} · 源站${d.sites} · 待复核${d.pending_rows} · 回炉${d.rework_queue} · 审计${d.audits}`;
+      ` · 批次${d.batches} · 源站${d.sites} · 待复核${d.pending_rows} · 回炉${d.rework_queue} · 审计${d.audits}` +
+      (rp.badge ? ` · ${rp.badge} v${rp.pack_version}` : '');
   } catch (e) {
     if (String(e.message).includes('未登录')) location.href = '/login';
   }

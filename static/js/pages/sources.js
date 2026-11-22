@@ -1,11 +1,16 @@
 
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip } from '../rulepack.js';
 
 export async function renderSources(el) {
-  const data = await api('/api/sites');
+  const [data, rp] = await Promise.all([
+    api('/api/sites'),
+    loadRulepack(),
+  ]);
   el.innerHTML = `
     <div class="card">
       <h2>源站名册</h2>
+      ${rulepackStrip(rp)}
       <p class="muted">登记可采集源站、日配额与启停状态，批次来源名与源站名对齐。</p>
       <div class="row">
         <input id="sname" placeholder="源站名" />

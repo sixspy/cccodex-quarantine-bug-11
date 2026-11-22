@@ -1,16 +1,19 @@
 
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip, showRulepackError } from '../rulepack.js';
 
 export async function renderPolicies(el) {
-  const [rules, batches] = await Promise.all([
+  const [rules, batches, rp] = await Promise.all([
     api('/api/rules'),
     api('/api/batches'),
+    loadRulepack(),
   ]);
   const openBatches = (batches.items || []).filter((b) => b.status !== '已关闭');
   el.innerHTML = `
     <div class="card">
-      <h2>入舱规则</h2>
-      <p class="muted">按质量标记自动入舱 / 关闭 / 观察。可对采集中批次一键套规则。</p>
+      <h2>入舱规则 <span class="chip" data-role="rulepack-version">包版本 ${rp.pack_key} v${rp.pack_version}</span></h2>
+      ${rulepackStrip(rp)}
+      <p class="muted">按质量标记自动入舱 / 关闭 / 观察。改规则后须升版钉死，否则清洗拒动。</p>
       <div class="row">
         <input id="title" placeholder="规则标题" />
         <select id="qm">
@@ -65,12 +68,20 @@ export async function renderPolicies(el) {
   };
   el.querySelector('#apply').onclick = async () => {
     const batch_id = Number(el.querySelector('#batch').value);
-    const r = await api('/api/rules/apply', {
-      method: 'POST',
-      body: JSON.stringify({ batch_id }),
-    });
-    el.querySelector('#applyMsg').textContent =
-      `入舱${r.entered} / 关闭${r.closed} / 观察${r.observed}`;
+    try {
+      const r = await api('/api/rules/apply', {
+        method: 'POST',
+        body: JSON.stringify({
+          batch_id,
+          pack_fp: rp.rules_fp,
+          pack_version: rp.pack_version,
+        }),
+      });
+      el.querySelector('#applyMsg').textContent =
+        `入舱${r.entered} / 关闭${r.closed} / 观察${r.observed}`;
+    } catch (e) {
+      showRulepackError(el, e);
+    }
   };
   el.querySelectorAll('[data-en]').forEach((btn) => {
     btn.onclick = async () => {

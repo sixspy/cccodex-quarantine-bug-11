@@ -61,7 +61,8 @@ def run_reconcile(db_path: str | None = None) -> dict:
 
 
 def dashboard(db_path: str | None = None) -> dict:
-    from app.services.rulepack_ver_audit import audit_summary as _rulepack_ver_audit
+    from app.services import rulepack as rulepack_svc
+
     with get_db(db_path) as conn:
         return {
             "batches": conn.execute("SELECT COUNT(*) AS c FROM capture_batches").fetchone()["c"],
@@ -81,5 +82,5 @@ def dashboard(db_path: str | None = None) -> dict:
                 "SELECT COUNT(*) AS c FROM policy_rules WHERE enabled=1"
             ).fetchone()["c"],
             "audits": conn.execute("SELECT COUNT(*) AS c FROM audit_events").fetchone()["c"],
-            "rulepack_ver_audit": _rulepack_ver_audit(db_path),
+            "rulepack": rulepack_svc.audit_summary(db_path),
         }

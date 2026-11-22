@@ -1,12 +1,17 @@
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip, showRulepackError } from '../rulepack.js';
 
 export async function renderCaptures(el) {
-  const data = await api('/api/batches');
-  const bins = await api('/api/bins');
+  const [data, bins, rp] = await Promise.all([
+    api('/api/batches'),
+    api('/api/bins'),
+    loadRulepack(),
+  ]);
   const openBin = (bins.items || []).find((b) => b.status === '开放');
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip" data-thick="rulepack_ver">规则包已亮</span> 抓取批次</h2>
+      <h2>抓取批次（目录）</h2>
+      ${rulepackStrip(rp)}
       <div class="row">
         <input id="src" placeholder="来源名" />
         <input id="note" placeholder="备注" />
@@ -52,10 +57,20 @@ export async function renderCaptures(el) {
   el.querySelectorAll('[data-auto]').forEach((btn) => {
     btn.onclick = async () => {
       if (!openBin) return;
-      await api('/api/quarantine/auto-enter', {
-        method: 'POST',
-        body: JSON.stringify({ batch_id: Number(btn.dataset.auto), bin_id: openBin.id }),
-      });
+      try {
+        await api('/api/quarantine/auto-enter', {
+          method: 'POST',
+          body: JSON.stringify({
+            batch_id: Number(btn.dataset.auto),
+            bin_id: openBin.id,
+            pack_fp: rp.rules_fp,
+            pack_version: rp.pack_version,
+          }),
+        });
+      } catch (e) {
+        showRulepackError(el, e);
+        return;
+      }
       await renderCaptures(el);
     };
   });

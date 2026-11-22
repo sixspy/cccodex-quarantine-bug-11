@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.db import get_db
 from app.services import audit as audit_svc
+from app.services import rulepack as rulepack_svc
 from app.services.errors import ServiceError
 
 
@@ -26,9 +27,13 @@ def decide(
     reviewer: str = "admin",
     comment: str = "",
     db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
 ) -> dict:
     if decision not in ("放行", "驳回回炉", "废弃"):
         raise ServiceError("裁决无效")
+    if decision == "放行":
+        rulepack_svc.require_aligned(db_path, pack_fp, pack_version)
     with get_db(db_path) as conn:
         ticket = conn.execute(
             "SELECT * FROM review_tickets WHERE id=?", (ticket_id,)

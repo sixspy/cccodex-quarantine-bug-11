@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip } from '../rulepack.js';
 
 export async function renderSettings(el) {
   const data = await api('/api/settings');
@@ -29,39 +30,47 @@ export async function renderSettings(el) {
     };
   });
 
-  try {
-    const dash = await api('/api/rulepack_ver/dash');
-    el.innerHTML += `<div class="card" style="margin-top:1rem">
-      <h3>规则包</h3>
-      <span class="chip">${dash.chip}</span>
-      <p class="muted">读轨 ${dash.active_read} · 切流指纹 ${dash.cutover_fp || '空'} · 拒回刷 ${dash.reject_refresh} · 归档 ${dash.archive_count} · 新旗 ${dash.live_flag || '空'} · 对齐差 ${dash.panel_pack_mismatch}</p>
-      <div class="row">
-        <button id="go_rulepack_ver" type="button">落台</button>
-        <button id="half_rulepack_ver" type="button">半修对齐</button>
-        <button id="cut_rulepack_ver" type="button">切流账册</button>
-        <button id="dual_rulepack_ver" type="button">双写两轨</button>
-      </div>
-    </div>`;
-    const go = el.querySelector('#go_rulepack_ver');
-    if (go) go.onclick = async () => {
-      await api('/api/rulepack_ver/commit', { method:'POST', body: JSON.stringify({ref:1}) });
-      await renderSettings(el);
-    };
-    const half = el.querySelector('#half_rulepack_ver');
-    if (half) half.onclick = async () => {
-      await api('/api/rulepack_ver/half', { method:'POST', body:'{}' });
-      await renderSettings(el);
-    };
-    const cut = el.querySelector('#cut_rulepack_ver');
-    if (cut) cut.onclick = async () => {
-      await api('/api/rulepack_ver/cutover', { method:'POST', body: JSON.stringify({ref_id:1, note:'规则包'}) });
-      await renderSettings(el);
-    };
-    const dual = el.querySelector('#dual_rulepack_ver');
-    if (dual) dual.onclick = async () => {
-      await api('/api/rulepack_ver/dual', { method:'POST', body: JSON.stringify({note:'规则包'}) });
-      await renderSettings(el);
-    };
-  } catch (e) { /* optional surface */ }
-
+  const rp = await loadRulepack();
+  el.innerHTML += `<div class="card" style="margin-top:1rem">
+    <h3>规则包（规则条只读口径）</h3>
+    ${rulepackStrip(rp)}
+    <table>
+      <thead><tr><th>账册#</th><th>包键</th><th>版本</th><th>规则指纹</th><th>钉版人</th><th>时间</th><th>钉点</th></tr></thead>
+      <tbody>
+        ${(rp.ledger || []).map((r) => `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.pack_key}</td>
+            <td>v${r.pack_version}</td>
+            <td>${r.rules_fp}</td>
+            <td>${r.actor}</td>
+            <td>${r.created_at}</td>
+            <td>${r.active ? '<span class="chip ok">现行钉点</span>' : ''}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:10px">
+      <input id="rpKey" value="${rp.pack_key}" placeholder="包键" />
+      <input id="rpNote" placeholder="升版备注" />
+      <button id="rpUpgrade" type="button">升版钉死</button>
+      <span id="rpMsg" class="err"></span>
+    </div>
+    <p class="muted">升版把当前规则指纹钉进切流账册并拨动钉点；两名仓管同抢只有一人成，另一人收白话回滚提示。</p>
+  </div>`;
+  el.querySelector('#rpUpgrade').onclick = async () => {
+    try {
+      await api('/api/rulepack/upgrade', {
+        method: 'POST',
+        body: JSON.stringify({
+          pack_key: el.querySelector('#rpKey').value,
+          note: el.querySelector('#rpNote').value,
+          expect_version: rp.pack_version,
+        }),
+      });
+    } catch (e) {
+      el.querySelector('#rpMsg').textContent = e.message;
+      return;
+    }
+    await renderSettings(el);
+  };
 }

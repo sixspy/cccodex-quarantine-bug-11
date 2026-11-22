@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.db import get_db
 from app.services import audit as audit_svc
 from app.services import quarantine as quarantine_svc
+from app.services import rulepack as rulepack_svc
 from app.services.errors import ServiceError
 
 
@@ -73,8 +74,14 @@ def set_enabled(rule_id: int, enabled: bool, db_path: str | None = None) -> dict
     return dict(out)
 
 
-def apply_to_batch(batch_id: int, db_path: str | None = None) -> dict:
+def apply_to_batch(
+    batch_id: int,
+    db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
+) -> dict:
     """Apply enabled policy rules to pending bad items in a batch."""
+    rulepack_svc.require_aligned(db_path, pack_fp, pack_version)
     with get_db(db_path) as conn:
         batch = conn.execute(
             "SELECT * FROM capture_batches WHERE id=?", (batch_id,)

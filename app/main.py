@@ -17,10 +17,8 @@ from app.services import quarantine as quarantine_svc
 from app.services import reconcile as reconcile_svc
 from app.services import review as review_svc
 from app.services import rework as rework_svc
+from app.services import rulepack as rulepack_svc
 from app.services import settings as settings_svc
-from app.services import rulepack_ver as rulepack_ver_svc
-from app.services import rulepack_ver_cutover as rulepack_ver_cutover_svc
-from app.services import rulepack_ver_dualwrite as rulepack_ver_dual_svc
 from app.services import sources as sources_svc
 from app.services.errors import ServiceError
 
@@ -165,6 +163,8 @@ def create_app():
                     int(body.get("item_id") or 0),
                     int(body.get("bin_id") or 0),
                     body.get("reason", ""),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
                 )
             )
 
@@ -175,6 +175,8 @@ def create_app():
                 quarantine_svc.auto_enter_bad(
                     int(body.get("batch_id") or 0),
                     int(body.get("bin_id") or 0),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
                 )
             )
 
@@ -192,6 +194,8 @@ def create_app():
                     body.get("decision", ""),
                     body.get("reviewer", "admin"),
                     body.get("comment", ""),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
                 )
             )
 
@@ -207,13 +211,21 @@ def create_app():
                 rework_svc.run_job(
                     int(request.matchdict["id"]),
                     bool(body.get("succeed", True)),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
                 )
             )
 
         def job_enqueue(request):
             _require(request)
             body = _read_json(request)
-            return _json(rework_svc.enqueue_from_row(int(body.get("row_id") or 0)))
+            return _json(
+                rework_svc.enqueue_from_row(
+                    int(body.get("row_id") or 0),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
+                )
+            )
 
         # reconcile / settings
         def reports_list(request):
@@ -306,40 +318,30 @@ def create_app():
         def rule_apply(request):
             _require(request)
             body = _read_json(request)
-            return _json(policies_svc.apply_to_batch(int(body.get("batch_id") or 0)))
-
-
-        def rulepack_ver_dash(request):
-            _require(request)
-            return _json(rulepack_ver_cutover_svc.board())
-
-        def rulepack_ver_commit(request):
-            _require(request)
-            body = _read_json(request)
-            return _json(rulepack_ver_svc.commit_action(body))
-
-        def rulepack_ver_half(request):
-            _require(request)
-            return _json(rulepack_ver_svc.reconcile_display())
-
-        def rulepack_ver_snap(request):
-            _require(request)
-            return _json(rulepack_ver_svc.snapshot())
-
-        def rulepack_ver_cutover(request):
-            _require(request)
-            body = _read_json(request)
             return _json(
-                rulepack_ver_cutover_svc.append_cutover(
-                    int(body.get("ref_id") or 0),
-                    str(body.get("note") or "规则包"),
+                policies_svc.apply_to_batch(
+                    int(body.get("batch_id") or 0),
+                    pack_fp=body.get("pack_fp"),
+                    pack_version=body.get("pack_version"),
                 )
             )
 
-        def rulepack_ver_dual(request):
+        def rulepack_status(request):
             _require(request)
+            return _json(rulepack_svc.status())
+
+        def rulepack_upgrade(request):
+            user = _require(request)
             body = _read_json(request)
-            return _json(rulepack_ver_dual_svc.apply_dualwrite(str(body.get("note") or "规则包")))
+            expect = body.get("expect_version")
+            return _json(
+                rulepack_svc.upgrade(
+                    body.get("pack_key", ""),
+                    body.get("note", ""),
+                    actor=user,
+                    expect_version=int(expect) if expect is not None else None,
+                )
+            )
 
         def audits_list(request):
             _require(request)
@@ -379,12 +381,8 @@ def create_app():
         config.add_route("rule_enable", "/api/rules/{id}/enable")
         config.add_route("rule_apply", "/api/rules/apply")
         config.add_route("audits", "/api/audits")
-        config.add_route("rulepack_ver_dash", "/api/rulepack_ver/dash")
-        config.add_route("rulepack_ver_commit", "/api/rulepack_ver/commit")
-        config.add_route("rulepack_ver_half", "/api/rulepack_ver/half")
-        config.add_route("rulepack_ver_snap", "/api/rulepack_ver/snap")
-        config.add_route("rulepack_ver_cutover", "/api/rulepack_ver/cutover")
-        config.add_route("rulepack_ver_dual", "/api/rulepack_ver/dual")
+        config.add_route("rulepack_status", "/api/rulepack")
+        config.add_route("rulepack_upgrade", "/api/rulepack/upgrade")
 
 
         config.add_view(root, route_name="root")
@@ -423,12 +421,8 @@ def create_app():
         config.add_view(wrap(rule_enable), route_name="rule_enable", request_method="POST")
         config.add_view(wrap(rule_apply), route_name="rule_apply", request_method="POST")
         config.add_view(wrap(audits_list), route_name="audits", request_method="GET")
-        config.add_view(wrap(rulepack_ver_dash), route_name="rulepack_ver_dash", request_method="GET")
-        config.add_view(wrap(rulepack_ver_commit), route_name="rulepack_ver_commit", request_method="POST")
-        config.add_view(wrap(rulepack_ver_half), route_name="rulepack_ver_half", request_method="POST")
-        config.add_view(wrap(rulepack_ver_snap), route_name="rulepack_ver_snap", request_method="GET")
-        config.add_view(wrap(rulepack_ver_cutover), route_name="rulepack_ver_cutover", request_method="POST")
-        config.add_view(wrap(rulepack_ver_dual), route_name="rulepack_ver_dual", request_method="POST")
+        config.add_view(wrap(rulepack_status), route_name="rulepack_status", request_method="GET")
+        config.add_view(wrap(rulepack_upgrade), route_name="rulepack_upgrade", request_method="POST")
 
 
         return config.make_wsgi_app()

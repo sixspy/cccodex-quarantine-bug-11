@@ -1,10 +1,15 @@
 import { api } from '../api.js';
+import { loadRulepack, rulepackStrip, showRulepackError } from '../rulepack.js';
 
 export async function renderRework(el) {
-  const data = await api('/api/rework/jobs');
+  const [data, rp] = await Promise.all([
+    api('/api/rework/jobs'),
+    loadRulepack(),
+  ]);
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip">试跑已亮</span> <span class="chip" data-thick="rulepack_ver">规则包已亮</span> 回炉队列</h2>
+      <h2>回炉队列</h2>
+      ${rulepackStrip(rp)}
       <table>
         <thead><tr><th>任务</th><th>条目</th><th>舱</th><th>状态</th><th>次数</th><th>操作</th></tr></thead>
         <tbody>
@@ -27,9 +32,19 @@ export async function renderRework(el) {
     </div>`;
   el.querySelectorAll('[data-ok]').forEach((btn) => {
     btn.onclick = async () => {
-      await api(`/api/rework/jobs/${btn.dataset.ok}/run`, {
-        method: 'POST', body: JSON.stringify({ succeed: true }),
-      });
+      try {
+        await api(`/api/rework/jobs/${btn.dataset.ok}/run`, {
+          method: 'POST',
+          body: JSON.stringify({
+            succeed: true,
+            pack_fp: rp.rules_fp,
+            pack_version: rp.pack_version,
+          }),
+        });
+      } catch (e) {
+        showRulepackError(el, e);
+        return;
+      }
       await renderRework(el);
     };
   });

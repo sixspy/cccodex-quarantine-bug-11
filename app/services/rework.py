@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.db import get_db
 from app.services import audit as audit_svc
+from app.services import rulepack as rulepack_svc
 from app.services import settings as settings_svc
 from app.services.errors import ServiceError
 
@@ -21,7 +22,15 @@ def list_jobs(db_path: str | None = None) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def run_job(job_id: int, succeed: bool = True, db_path: str | None = None) -> dict:
+def run_job(
+    job_id: int,
+    succeed: bool = True,
+    db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
+) -> dict:
+    if succeed:
+        rulepack_svc.require_aligned(db_path, pack_fp, pack_version)
     with get_db(db_path) as conn:
         job = conn.execute("SELECT * FROM rework_jobs WHERE id=?", (job_id,)).fetchone()
         if not job:
@@ -82,9 +91,13 @@ def run_job(job_id: int, succeed: bool = True, db_path: str | None = None) -> di
     return dict(out)
 
 
-def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
-    from app.services.rulepack_ver import commit_action
-    commit_action({"row_id": row_id, "mode": "dry"}, db_path)
+def enqueue_from_row(
+    row_id: int,
+    db_path: str | None = None,
+    pack_fp: str | None = None,
+    pack_version: int | None = None,
+) -> dict:
+    rulepack_svc.require_aligned(db_path, pack_fp, pack_version)
     with get_db(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM quarantine_rows WHERE id=?", (row_id,)

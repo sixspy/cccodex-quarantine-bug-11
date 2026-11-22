@@ -34,6 +34,8 @@ th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: lef
 .chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #234652; font-size: .78rem; }
 .chip.bad { background: #5a2f2a; }
 .chip.ok { background: #1f4d3d; }
+.rulepack-strip { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; padding: 8px 10px; background: #10252d; border: 1px solid var(--line); border-radius: 10px; }
+.rulepack-strip .err { flex-basis: 100%; }
 h2 { margin: 0 0 10px; font-size: 1.15rem; }
 .stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
 .stat { background: #10252d; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }

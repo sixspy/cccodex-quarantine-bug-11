@@ -122,9 +122,7 @@ def seed_if_needed(db_path: str | None = None) -> None:
             VALUES ('system', '种子初始化', 'lab', 0, '首次启动写入样例')
             """
         )
-        try:
-            from app.services.rulepack_ver import seed_skew
-            seed_skew(db_path)
-        except Exception:
-            pass
         _meta_set(conn, "seeded", "1")
+    from app.services import rulepack as rulepack_svc
+
+    rulepack_svc.ensure_seeded(db_path)
